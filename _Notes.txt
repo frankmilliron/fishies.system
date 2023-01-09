@@ -1,0 +1,33 @@
+
+0-100     ZP
+
+800-1400  program
+
+2000-4000 graphic
+4000-B500 sprites
+
+Entry - $B15
+
+Keypress - $BD2
+
+1 variable at 14E6=00, 1508=00 ??
+
+ZP Usage: 6,7,1a,1b,1c,1c,1e,4e,4f,d6,d7,eb,ec,ed,ef,f9,fb
+
+$loc=$data
+06=28
+07=3a
+1a=00
+1b=40
+1c=80
+4e=ff
+4f=ff
+d6=e0
+d7=00
+eb=ff
+ec=ff
+ed=ff
+ef=ff
+f9=55
+fb=00
+

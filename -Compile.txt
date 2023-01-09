@@ -1,0 +1,64 @@
+
+setopt interactivecomments
+# (sometimes) allows pasting into zsh without errors
+
+
+# set up variables
+
+imagename=FISHIES.hdv
+prodos_vol=FISHIES
+outpath=/Users/Frank/Desktop
+image=$outpath/$imagename
+prodos_path=/$prodos_vol
+
+fishies=/Volumes/TRANSFER/fishies.system/PackMinimal
+fishies_bin=/Volumes/TRANSFER/fishies.system/PackMinimal/bin
+
+blank_img=/Volumes/TRANSFER/A2\ Disk\ Images/blank32mb.hdv.zip
+blank_unp=blank.hdv
+
+A2binpath=/Volumes/TRANSFER/A2_Binaries
+V2config="/Users/Frank/Library/Application Support/Virtual ][/DefaultConfig.vii"
+
+
+# delete old versions & set up new disk image
+rm $image
+unzip $blank_img -d $outpath
+mv $outpath/$blank_unp $outpath/$imagename
+cadius RENAMEVOLUME $image $prodos_vol
+
+
+# add QUIT.SYSTEM to drop to BitsyBye on boot
+#cadius ADDFILE $image $prodos_vol "$A2binpath/QUIT.SYSTEM#FF2000"
+
+
+# compile fishies & add it
+cd $fishies
+acme fishies.system.a
+cadius ADDFILE $image $prodos_vol FISHIES.SYSTEM#ff0000
+
+
+# add Fishies binaries
+cadius ADDFILE $image $prodos_vol "$fishies_bin/FISHIES.1#060800"
+cadius ADDFILE $image $prodos_vol "$fishies_bin/FISHIES.2#062000"
+
+
+# add PRODOS to make it bootable
+cadius ADDFILE $image $prodos_vol "$A2binpath/PRODOS#FF0000"
+
+
+#cadius CHECKVOLUME $image
+#cadius CATALOG $image
+
+
+# open new disk image in Virtual ][
+osascript -e 'tell app "Virtual ][" to close every machine saving no'
+osascript -e 'tell app "Virtual ][" to open "'"$V2config"'"'
+osascript -e 'tell app "Virtual ][" to insert "'"$image"'" into device "S7D1" of front machine'
+osascript -e 'tell app "Virtual ][" to type line "PR#7"'
+osascript -e 'tell app "Virtual ][" to activate'
+
+
+# close Terminal window
+#exit
+

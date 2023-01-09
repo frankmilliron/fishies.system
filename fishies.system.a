@@ -1,0 +1,263 @@
+
+; fishies.system.a
+
+; ProDOS pack of "Fishies", sans title screen
+; January 8, 2023
+; (c) 2023 by Frank Milliron, Lombard $oftware
+; https://github.com/frankmilliron/fishies.system
+
+; paste '-Compile.txt' to assemble  *wink*
+
+
+!cpu 6502
+!to "FISHIES.SYSTEM#ff0000",plain
+
+*=$2000
+
+
+; ****************************************************************
+; *                           Constants                          *
+; ****************************************************************
+
+Reloc          = $1400
+
+MLI            = $BF00    ; ProDOS Machine Language Interface
+
+Keyboard       = $C000    ; get keypress
+KeyStrobe      = $C010    ; clear keyboard strobe
+VBL            = $C019    ; vertical blank
+SS_Main        = $C004    ; write to main mem
+SS_Aux         = $C005    ; write to aux mem
+SS_40col       = $C00C    ; set 40-column mode
+SS_Border      = $C034    ; set //gs border color
+SS_Speed       = $C036    ; set //gs processor speed
+SS_Grfx        = $C050    ; graphics mode
+SS_Full        = $C052    ; full-screen mode
+SS_Page1       = $C054    ; show graphics page 1
+SS_Page2       = $C055    ; show graphics page 2
+SS_Lores       = $C056    ; turn on lores graphics
+SS_Hires       = $C057    ; turn on hires graphics
+SS_DblOff      = $C05F    ; turn off double graphics modes
+
+ROM_Home       = $FC58    ; clear text screen 1
+ROM_Text       = $FB2F    ; exit graphics mode
+ROM_Pwrup      = $FB6F    ; set reset vector checksum
+
+
+; ****************************************************************
+; *                    Create *.SYSTEM Format                    *
+; ****************************************************************
+
+         jmp   SYSTEM
+
+         !hex  EE EE      ; signifies launchable prodos file
+         !byte $41        ; prodos path buffer length (65 bytes)
+         !fill 65,0       ; prodos full path buffer
+
+SYSTEM                    ; *=$2047
+         sta   KeyStrobe  ; clear stray keypresses
+         jsr   ROM_Home
+         ;jsr   SetReset
+
+Move     ldy   #0
+-        lda   Relocated,y
+         sta   Reloc,y
+         dey
+         bne   -
+         inc   Move+4
+         inc   Move+7
+         lda   Move+7
+         cmp   #$20       ; #> size of FISHIES.SYSTEM + $1500
+         bne   Move
+
+         jmp   Reloc
+
+
+; ****************************************************************
+; *                     Initialize Everything                    *
+; ****************************************************************
+
+Relocated
+!pseudopc Reloc {
+
+         lda   #0         ; set io_buffer to $B500
+         sta   buffer     ; (buffer size is $400)
+         lda   #$B5
+         sta   buffer+1
+
+         lda   #<filename1
+         sta   InfoParms+1
+         lda   #>filename1
+         sta   InfoParms+2
+         jsr   GetFile    ; FISHIES.1, A$2000
+
+         lda   #<filename2
+         sta   InfoParms+1
+         lda   #>filename2
+         sta   InfoParms+2
+         jsr   GetFile    ; FISHIES.2, A$800
+
+         lda   #$28
+         sta   $06
+         lda   #$3a
+         sta   $07
+         lda   #0
+         sta   $1a
+         sta   $d7
+         sta   $fb
+         lda   #$55
+         sta   $f9
+         lda   #$40
+         sta   $1b
+         lda   #$80
+         sta   $1c
+         lda   #$e0
+         sta   $d6
+         lda   #$FF
+         ;sta   $4e        ; RNG?
+         ;sta   $4f
+         sta   $eb
+         sta   $ec
+         sta   $ed
+         sta   $ef
+
+         bit   SS_Grfx
+         bit   SS_Full
+         bit   SS_Page1
+         bit   SS_Hires   ; turn on graphics
+
+GoFish   jmp   $B15
+
+
+; ****************************************************************
+; *                           Goodbye!                           *
+; ****************************************************************
+
+Exit     sta   KeyStrobe
+
+         jsr   ROM_Text
+         jsr   ROM_Home
+
+         inc   $3F4       ; invalidate reset vector
+         jsr   MLI
+         !byte $65        ; ProDOS QUIT
+         !word QuitParms
+
+QuitParms
+         !byte 4          ; 4 parameters
+         !byte 0
+         !word 0          ; none used
+         !byte 0
+         !word 0
+
+
+; ****************************************************************
+; *                 Get a File Using ProDOS MLI                  *
+; ****************************************************************
+
+GetFile  jsr   MLI        ; (loaded to aux_type address)
+         !byte $C4        ; ProDOS GET_FILE_INFO
+         !word InfoParms
+         bcs   Error
+
+         lda   InfoParms+1 ; move filename
+         sta   OpenParms+1
+         lda   InfoParms+2
+         sta   OpenParms+2
+
+         lda   InfoParms+5 ; set aux_type location
+         sta   ReadParms+2
+         lda   InfoParms+6
+         sta   ReadParms+3
+
+         lda   buffer     ; set io_buffer
+         sta   OpenParms+3
+         lda   buffer+1
+         sta   OpenParms+4
+
+         jsr   MLI
+         !byte $C8        ; ProDOS OPEN
+         !word OpenParms
+         bcs   Error
+
+         lda   OpenParms+5 ; move assigned ref_num
+         sta   ReadParms+1
+         sta   EOFParms+1
+
+         jsr   MLI
+         !byte $D1        ; ProDOS GET_EOF
+         !word EOFParms
+         bcs   Error
+
+         lda   EOFParms+2 ; set request_count
+         sta   ReadParms+4
+         lda   EOFParms+3
+         sta   ReadParms+5
+
+         jsr   MLI
+         !byte $CA        ; ProDOS READ
+         !word ReadParms
+         bcs   Error
+
+         jsr   MLI
+         !byte $CC        ; ProDOS CLOSE
+         !word CloseParms
+         bcs   Error
+         
+         rts
+
+Error    jmp   Exit
+
+InfoParms                 ; GET_FILE_INFO ($C4) Parameters
+         !byte   $0a      ; param_count
+         !word   0        ; pathname
+         !byte   0        ; access
+         !byte   0        ; file_type
+         !word   0        ; aux_type
+         !byte   0        ; storage_type
+         !word   0        ; blocks_used
+         !word   0        ; mod_date
+         !word   0        ; mod_time
+         !word   0        ; create_date
+         !word   0        ; create_time
+
+OpenParms                 ; OPEN ($C8) Parameters
+         !byte   $03      ; param_count
+         !word   0        ; pathname
+         !word   0        ; io_buffer
+         !byte   0        ; ref_num
+
+EOFParms                  ; GET_EOF ($D1) Parameters
+         !byte   $02      ; param_count
+         !word   0        ; ref_num
+         !24     0        ; EOF (low bytes first)
+
+ReadParms                 ; READ ($CA) Parameters
+         !byte   $04      ; param_count
+         !byte   0        ; ref_num
+         !word   0        ; data_buffer
+         !word   0        ; request_count
+         !word   0        ; trans_count
+
+CloseParms                ; CLOSE ($CC) Parameters
+         !byte   $01      ; param_count
+         !byte   0        ; ref_num 0 = all
+
+
+; ****************************************************************
+; *                 comp.binaries.apple2.fishies                 *
+; ****************************************************************
+
+filename1
+    !byte   (filename1_e-filename1)-1
+    !text   "FISHIES.1"         ; $800
+filename1_e
+
+filename2
+    !byte   (filename2_e-filename2)-1
+    !text   "FISHIES.2"         ; $2000
+filename2_e
+
+buffer   !word 0
+
+}
