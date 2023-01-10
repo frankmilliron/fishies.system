@@ -97,29 +97,8 @@ Relocated
          sta   InfoParms+2
          jsr   GetFile    ; FISHIES.2, A$800
 
-         lda   #$28
-         sta   $06
-         lda   #$3a
-         sta   $07
-         lda   #0
-         sta   $1a
-         sta   $d7
-         sta   $fb
-         lda   #$55
-         sta   $f9
-         lda   #$40
-         sta   $1b
-         lda   #$80
+         lda   #$80       ; blit color
          sta   $1c
-         lda   #$e0
-         sta   $d6
-         lda   #$FF
-         ;sta   $4e        ; RNG?
-         ;sta   $4f
-         sta   $eb
-         sta   $ec
-         sta   $ed
-         sta   $ef
 
          bit   SS_Grfx
          bit   SS_Full
